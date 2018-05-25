@@ -1,0 +1,18 @@
+module desugar/statements
+
+imports
+  
+  signatures/expressions-sig
+  signatures/statements-sig
+  signatures/vars-sig
+  desugar/expressions
+
+rules
+  //for (;;;) -> while (true) 
+  desugar: For(None(), None(), None(), body)     -> While(True(), body)
+  desugar: For(None(), Some(cond), None(), body) -> While(cond, body)
+  
+  desugar: For(a, None(), b, body)               -> For(a, True(), b, body)
+
+  
+  

@@ -1,0 +1,121 @@
+module types
+
+imports
+  Common
+  modifiers
+  expressions
+
+template options
+  tokenize : "([;"
+
+context-free start-symbols
+  Type
+  SimpleType
+  ArrayType
+  FunctionType
+  UserDefinedType
+  MappingType
+
+lexical syntax
+  //Multiples of 8 up to 256
+  Mult8    = "8" | "16" | "24" | "32" | "40" | "48" | "56" | "64" | "72" | "80" | "88" | "96" | "104" | "112" | "120" | "128" | "136" | "144" | "152" | "160" | "168" | "176" | "184" | "192" | "200" | "208" | "216" | "224" | "232" | "240" | "248" | "256"
+
+  //All numbers from 0 to 80 (inclusive)
+  ZeroTo80 = [0-9] | ([1-7][0-9]) | "80"
+  
+  //All numbers from 1 to 32 (inclusive)
+  OneTo32 = [1-9] | ([12][0-9]) | ("3" [0-2])
+  
+  //Define the elementary types as keywords
+  KEYWORD = TYPEKEYWORD
+  TYPEKEYWORD = "bool"
+  TYPEKEYWORD = "int"
+  TYPEKEYWORD = "uint"
+  TYPEKEYWORD = "fixed"
+  TYPEKEYWORD = "ufixed"
+  TYPEKEYWORD = "address"
+  TYPEKEYWORD = "bytes"
+  TYPEKEYWORD = "byte"
+  TYPEKEYWORD = "string"
+  TYPEKEYWORD = "var"
+//  TYPEKEYWORD = "int" Mult8
+//  TYPEKEYWORD = "uint" Mult8
+//  TYPEKEYWORD = "fixed" MxN
+//  TYPEKEYWORD = "ufixed" MxN
+//  TYPEKEYWORD = "bytes" OneTo32
+//  TYPEKEYWORD = "int" | "int8" | "int16" | "int24" | "int32" | "int40" | "int48" | "int56" | "int64" | "int72" | "int80" | "int88" | "int96" | "int104" | "int112" | "int120" | "int128" | "int136" | "int144" | "int152" | "int160" | "int168" | "int176" | "int184" | "int192" | "int200" | "int208" | "int216" | "int224" | "int232" | "int240" | "int248" | "int256"
+//  TYPEKEYWORD = "uint" | "uint8" | "uint16" | "uint24" | "uint32" | "uint40" | "uint48" | "uint56" | "uint64" | "uint72" | "uint80" | "uint88" | "uint96" | "uint104" | "uint112" | "uint120" | "uint128" | "uint136" | "uint144" | "uint152" | "uint160" | "uint168" | "uint176" | "uint184" | "uint192" | "uint200" | "uint208" | "uint216" | "uint224" | "uint232" | "uint240" | "uint248" | "uint256"
+//  TYPEKEYWORD = "bytes" | "bytes1" | "bytes2" | "bytes3" | "bytes4" | "bytes5" | "bytes6" | "bytes7" | "bytes8" | "bytes9" | "bytes10" | "bytes11" | "bytes12" | "bytes13" | "bytes14" | "bytes15" | "bytes16" | "bytes17" | "bytes18" | "bytes19" | "bytes20" | "bytes21" | "bytes22" | "bytes23" | "bytes24" | "bytes25" | "bytes26" | "bytes27" | "bytes28" | "bytes29" | "bytes30" | "bytes31" | "bytes32"
+
+  ID = TYPEKEYWORD {reject}
+
+lexical restrictions
+  Mult8    -/- [0-9]
+  ZeroTo80 -/- [0-9]
+  MxN      -/- [0-9]
+  OneTo32  -/- [0-9]
+
+context-free syntax
+  //Distinguish between different sorts of types
+  Type = SimpleType {prefer}
+  Type = UserDefinedType
+  Type = ArrayType
+  Type = FunctionType
+  Type = MappingType
+  
+  //Elementary types
+  ElementaryType.FixedArrayType   = <<ElementaryType>[<Exp>]>
+  ElementaryType.DynamicArrayType = <<ElementaryType>[]>
+  ElementaryType                  = SimpleType {prefer}
+  ElementaryType                  = FAType
+  ElementaryType                  = DAType
+  
+  //Simple types
+  SimpleType.BooleanType = <bool>    {prefer}
+  SimpleType.AddressType = <address> {prefer}
+  //The rest is defined in kernel syntax below
+   
+ //User defined type (enum, struct)
+  UserDefinedType.UserDefinedType = PATH {avoid}
+  
+  //Array types (FAType = Fixed size array type, DAType = Dynamic sized array type)
+  ArrayType                  = FAType
+  ArrayType                  = DAType
+  ArrayType.FixedArrayType   = <<Type>[<Exp>]> //fixed sized arrays
+  ArrayType.DynamicArrayType = <<Type>[]>       //dynamic sized arrays
+  
+  //bytes1 - bytes32 are defined in kernel syntax
+  FAType.ByteType              = <byte>           //byte = bytes1
+  DAType.DynamicBytesArrayType = <bytes>          //bytes = dynamic sized array of bytes
+  DAType.StringType            = <string>         //string = dynamic sized "array"
+  
+  //Function type
+  FunctionType.FunctionType  = <function (<{Type ", "}*>) <ModVisibilityIntExt?> <ModStateMutability?> <FunReturnsType?>>
+  FunReturnsType.ReturnsType = <returns (<{Type ", "}+>)>
+  
+  //Mapping type
+  MappingType.MappingType = <mapping(<MappingKeyType> =\> <Type>)>
+  
+  //The key of the mapping must be an "elementary type" (any type literal)
+  MappingKeyType = SimpleType
+  MappingKeyType = FAType
+  MappingKeyType = DAType
+  
+  //Local variables can have their type inferred
+  LocalVarType.Var = <var>
+  LocalVarType = Type
+
+syntax
+  //I define the different type variants in kernel syntax.
+  //If I define them in context-free syntax, it would allow types like `int   8`
+  //If I define them in lexical syntax, it would create an `Int("int8")` in the AST instead of an `Int("8")`.
+  SimpleType-CF.IntType    = "int" Mult8?-CF {prefer}
+  SimpleType-CF.UIntType   = "uint" Mult8?-CF {prefer}
+  SimpleType-CF.FixedType  = "fixed" MxN-CF {prefer}
+  SimpleType-CF.UFixedType = "ufixed" MxN-CF {prefer}
+
+  FAType-CF.FixedBytesArrayType = "bytes" OneTo32-CF
+  
+  //Precision for fixed point numbers is MxN where M is a multiple of 8 and N is between 0 and 80
+  MxN-CF.None = 
+  MxN-CF.MxN  = Mult8-CF "x" ZeroTo80-CF

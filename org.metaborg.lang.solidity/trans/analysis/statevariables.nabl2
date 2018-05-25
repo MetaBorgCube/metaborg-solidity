@@ -1,0 +1,30 @@
+module analysis/statevariables
+
+imports
+  signatures/-
+
+signature
+  namespaces
+    //StateVar { constant : term }
+
+rules
+  [[ StateVariable(solty, mod, name, assignment) ^ (s) ]] :=
+    [[ solty ^ (s) : ty ]],
+    
+    Var{name} <- s,
+    Var{name}.origin   := StateVariable(),
+    Var{name}.constant := FalseC(),
+    Var{name} : ty !.
+    //TODO modifier
+    //TODO assignment
+  
+  [[ ConstantStateVariable(solty, mod1, _, mod2, name, assignment) ^ (s) ]] :=
+    [[ solty ^ (s) : ty ]],
+    
+    Var{name} <- s,
+    Var{name}.origin   := StateVariable(),
+    Var{name}.constant := TrueC(),
+    Var{name} : ty !.
+    //TODO modifier
+    //TODO assignment
+    //TODO constant

@@ -1,0 +1,6 @@
+*.aterm
+*.dot
+*.unifier
+*.gv
+*.scope-graph
+*.name-resolution
