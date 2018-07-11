@@ -2,6 +2,7 @@ module codegen/statements
 
 imports
   codegen/expressions
+  codegen/types
   
   nabl2/api
   
@@ -15,7 +16,7 @@ imports
   desugar/-
   
   utils/externals
-
+  
   libspoofax/stratego/debug
 
 rules
@@ -27,8 +28,8 @@ rules
    * Converts a statement to the corresponding ebc instructions.
    *
    * @param  stack               - the stack
-   * @param  stack               - a stack of tags used for continue
-   * @param  stack               - a stack of tags used for breaks
+   * @param  list(tag)           - a list of tags used for continue
+   * @param  list(tag)           - a list of tags used for breaks
    * @param  statement (current) - the statement to convert
    * @return list(instruction)   - the ebc instructions that represent the statement
    */
@@ -36,16 +37,19 @@ rules
   
   //-----------------------------------------------------------------------------------------------
   //Blocks
+  //-----------------------------------------------------------------------------------------------
   
   stmt-to-ebc(|stack, c, b): Block(stmts) -> <mapconcat(stmt-to-ebc(|stack, c, b))> stmts
   
   //-----------------------------------------------------------------------------------------------
   //Expression statements
+  //-----------------------------------------------------------------------------------------------
   
   stmt-to-ebc(|stack, c, b): ExpStmt(e1) -> <nopush-exp-to-ebc(|stack)> e1
   
   //-----------------------------------------------------------------------------------------------
   //If statements
+  //-----------------------------------------------------------------------------------------------
   
   stmt-to-ebc(|stack, c, b): If(condExp, trueStmt, Else(elseStmt)) -> instr
     where
@@ -86,8 +90,46 @@ rules
   
   //-----------------------------------------------------------------------------------------------
   //Loops
+  //-----------------------------------------------------------------------------------------------
   
-  //TODO For loops
+  stmt-to-ebc(|stack, continues, breaks): For(preStmt, condExp, postExp, body) -> instr
+    where
+    tagLoop     := <newname> "For_Loop";
+    tagAfterFor := <newname> "For_After";
+    
+    (
+      (<?Some(preStmt')> preStmt;
+       pre      := <stmt-to-ebc(|stack, continues, breaks)> preStmt') <+
+       pre      := []
+    );
+    condition   := <exp-to-ebc(|stack)> condExp; ebc-stack-pop(|stack);
+    (
+      (<?Some(postExp')> postExp;
+       post     := <exp-to-ebc(|stack)> postExp'; ebc-stack-pop(|stack)) <+
+       post     := []
+    );
+    
+    continues'  := [tagLoop | continues];
+    breaks'     := [tagAfterFor | breaks];
+    bodyInstr   := <stmt-to-ebc(|stack, continues', breaks')> body;
+    
+    instr := <concat> [
+      pre,                           //  <pre>
+      [                              //:loop
+        JUMPDESTTAG(tagLoop) ],      //  JUMPDEST
+      condition,                     //  PUSH condition
+      [ ISZERO(),                    //  ISZERO
+        PUSHTAG(tagAfterFor),        //  PUSHTAG tagAfterFor
+        JUMPI() ],                   //  JUMPI
+      bodyInstr,                     //  <body>
+      post,                          //  <post>
+      [ PUSHTAG(tagLoop),            //  PUSHTAG tagLoop
+        JUMP(),                      //  JUMP
+                                     //:afterFor
+        JUMPDESTTAG(tagAfterFor) ]   //  JUMPDEST
+    ]
+    
+  
   stmt-to-ebc(|stack, continues, breaks): While(e, body) -> instr
     where
     tagLoop       := <newname> "While_Loop";
@@ -140,8 +182,7 @@ rules
   
   //-----------------------------------------------------------------------------------------------
   //Control flow
-  
-  //Return statements
+  //-----------------------------------------------------------------------------------------------
   
   stmt-to-ebc(|stack, c, b): ReturnStatement(name, e1) -> instr
     where
@@ -168,16 +209,20 @@ rules
   
   stmt-to-ebc(|stack, continues, b): Continue() -> [ PUSHTAG(tag), JUMP() ]
     where
-    tag := <ebc-stack-pop(|continues)>
+    <?[tag | _]> continues
   
   stmt-to-ebc(|stack, c, breaks): Break() -> [ PUSHTAG(tag), JUMP() ]
     where
-    tag := <ebc-stack-pop(|breaks)>
+    <?[tag | _]> breaks
+    
+    
+  stmt-to-ebc(|stack, c, b): Throw() -> [ PUSH(1, 0), DUP(1), REVERT() ]
 
-  //Throw and emit are not yet supported
+  //Emit is not yet supported
   
   //-----------------------------------------------------------------------------------------------
   //Variable declaration
+  //-----------------------------------------------------------------------------------------------
   
   //These are already handled by var-to-stack (see functions.str)
   stmt-to-ebc(|stack, c, b): d@DeclareVar(_, _, _) -> []

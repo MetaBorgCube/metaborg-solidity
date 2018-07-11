@@ -3,7 +3,6 @@ module analysis/types
 imports
   desugar/functions
   signatures/types-sig
-  signatures/vars-sig
 
 signature
   sorts
@@ -16,30 +15,32 @@ signature
     FixedT       : INT * INT -> Type
     UFixedT      : INT * INT -> Type
     
-    //One word types
+    //More general types for constants
+    NrT          : INT * INT -> Type
+    FractT       : INT * INT * INT * INT -> Type
+    StringLitT   : INT -> Type
+    
+    //"Simple" types
     BoolT        : Type
-    AddressT     : Type
+    AddressT     : scope -> Type
     StringT      : Type
     
-    //Byte arrays
-    FBytesT      : INT -> Type
-    DBytesT      : Type
-    
     //Array types
-    FArrayT      : Type * INT -> Type
-    DArrayT      : Type -> Type
+    FBytesT      : INT * scope -> Type
+    DBytesT      : scope -> Type
+    FArrayT      : Type * string * scope -> Type
+    DArrayT      : Type * scope -> Type
     
     //Function types
     FunctionT    : list(Type) * Type -> Type
     FunctionModT : list(Type) -> Type
     
-    //Mapping types
+    //Complex types
     MappingT     : Type * Type -> Type
-    
-    //Tuples
     TupleT       : list(Type) -> Type
+    NamedT       : occurrence * scope * Type -> Type
 
-    //User defined types
+    //Type kinds
     EnumT        : Type
     EventT       : list(Type) -> Type
     StructT      : Type
@@ -47,30 +48,32 @@ signature
     InterfaceT   : Type
     LibraryT     : Type
     BuiltInT     : Type
+    ImportT      : Type
     
-    //Named type
-    NamedT       : occurrence * Type -> Type
-    
-    //Var type
+    //Special types
     VarT         : Type
-    
-    //Void type (for functions with no return)
+    AnyT         : Type
     VoidT        : Type
+    PackedT      : Type
     
-    //Simplified type
+    //---------------------------------------------------------------------------------------------
+    //Simplified types
     IntTS        : Type
     UIntTS       : Type
-    FBytesTS     : Type
     FixedTS      : Type
     UFixedTS     : Type
+    
+    AddressTS    : Type
+    
+    FBytesTS     : Type
+    DBytesTS     : Type
     FArrayTS     : Type
     DArrayTS     : Type
-    NamedTS      : Type
+    StringTS     : Type
     
-    //More general types for constants
-    NrT          : INT * INT -> Type
-    FractT       : INT * INT * INT * INT -> Type
-    StringLitT   : INT -> Type
+    NamedTS      : Type
+    MappingTS    : Type
+    FunctionTS   : Type
     
     InvalidType  : Type
 
@@ -80,50 +83,91 @@ signature
 
 rules
   //-----------------------------------------------------------------------------------------------
+  //Helper functions
+  GetAddressType [[ _ ^ (s) : tyAddress ]] :=
+    BuiltInType{"address"} -> s,
+    BuiltInType{"address"} |-> address,
+    address ?===> addressScope,
+    tyAddress == AddressT(addressScope).
+  
+  //-----------------------------------------------------------------------------------------------
   //Simple types
-  [[ BooleanType() ^ (s) : BoolT()    ]].
-  [[ AddressType() ^ (s) : AddressT() ]].
-  [[ StringType()  ^ (s) : StringT()  ]].
+  [[ BooleanType() ^ (s)   : BoolT()   ]].
+  [[ StringType()  ^ (s)   : StringT() ]].
+  [[ a@AddressType() ^ (s) : tyAddress ]] :=
+    GetAddressType [[ a ^ (s) : tyAddress ]].
 
   //-----------------------------------------------------------------------------------------------
   //Numbers
-  [[ IntType(x)  ^ (s) : ty ]] := ty == IntT(x).
-  [[ UIntType(x) ^ (s) : ty ]] := ty == UIntT(x).
-  [[ FixedType(MxN(m, n))  ^ (s) : ty ]] := ty == FixedT(m, n), VarT() <sub! ty.
-  [[ UFixedType(MxN(m, n)) ^ (s) : ty ]] := ty == UFixedT(m, n), VarT() <sub! ty.
+  [[ IntType(x)  ^ (s) : tyInt  ]] := tyInt == IntT(x).
+  [[ UIntType(x) ^ (s) : tyUInt ]] := tyUInt == UIntT(x).
+  [[ FixedType(MxN(m, n))  ^ (s) : tyFixed  ]] := tyFixed == FixedT(m, n), VarT() <sub! tyFixed.
+  [[ UFixedType(MxN(m, n)) ^ (s) : tyUFixed ]] := tyUFixed == UFixedT(m, n), VarT() <sub! tyUFixed.
   
   //-----------------------------------------------------------------------------------------------
   //Byte arrays
-  [[ FixedBytesArrayType(x)  ^ (s) : ty ]] := ty == FBytesT(x).
-  [[ DynamicBytesArrayType() ^ (s) : ty ]] := ty == DBytesT().
+  [[ FixedBytesArrayType(x)  ^ (s) : tyFBytes ]] :=
+    BuiltInType{"farray"} -> s,
+    BuiltInType{"farray"} |-> farray,
+    farray ?===> farrayScope,
+    tyFBytes == FBytesT(x, farrayScope).
+  [[ DynamicBytesArrayType() ^ (s) : tyDBytes ]] :=
+    BuiltInType{"darray"} -> s,
+    BuiltInType{"darray"} |-> darray,
+    darray ?===> darrayScope,
+    tyDBytes == DBytesT(darrayScope).
   
   //-----------------------------------------------------------------------------------------------
   //Arrays
-  [[ FixedArrayType(base, sizeExp) ^ (s) : ty ]] :=
-    [[ base ^ (s) : baseTy ]],
-    [[ sizeExp ^ (s) : sizeTy ]],
-    ty == FArrayT(baseTy, 1),
-    VarT() <sub! ty,
+  [[ FixedArrayType(base, sizeExp) ^ (s) : tyFArray ]] :=
+    [[ base    ^ (s) : tyBase ]],
+    [[ sizeExp ^ (s) : tySize ]],
     
-    false | note $[Size is not checked].
+    BuiltInType{"farray"} -> s,
+    BuiltInType{"farray"} |-> farray,
+    farray ?===> farrayScope,
+    BuiltInType{"darray"} -> s,
+    BuiltInType{"darray"} |-> darray,
+    darray ?===> darrayScope,
+    
+    //Check if the size is an unsigned integer
+    tySizeReal is sub.lub of (tySize, UIntT(256)) | error $[Size must be an unsigned integer] @sizeExp,
+    UIntTS() is simplifyType of tySizeReal        | error $[Size must be an unsigned integer] @sizeExp,
+    
+    //Determine the size from the expression
+    size is getLiteralInt of sizeExp | error $[Array size must be a constant integer literal] @sizeExp,
+    tyFArray == FArrayT(tyBase, size, farrayScope),
+    
+    //Ensure that casting and var subtyping works.
+    tyDArray == DArrayT(tyBase, darrayScope),
+    tyFArray <cast! tyDArray,
+    
+    VarT()   <sub! tyFArray,
+    VarT()   <sub! tyDArray.
   
-  [[ DynamicArrayType(base)        ^ (s) : ty ]] :=
-    [[ base ^ (s) : baseTy ]],
-    ty == DArrayT(baseTy),
-    VarT() <sub! ty.
+  [[ DynamicArrayType(base) ^ (s) : tyDArray ]] :=
+    [[ base ^ (s) : tyBase ]],
+    
+    BuiltInType{"darray"} -> s,
+    BuiltInType{"darray"} |-> darray,
+    darray ?===> darrayScope,
+    
+    tyDArray == DArrayT(tyBase, darrayScope),
+    VarT() <sub! tyDArray.
   
   //-----------------------------------------------------------------------------------------------
   //Functions
-  [[ FunctionType(args, vis, stateMut, retParam) ^ (s) : ty ]] :=
-    [[ retParam ^ (s) : retTy ]],
-    Map1T [[ args ^ (s) : argTys ]],
-    ty == FunctionT(argTys, retParam),
-    
+  [[ FunctionType(args, vis, stateMut, retParam) ^ (s) : tyFunT ]] :=
+    [[ retParam ^ (s) : tyRet ]],
     [[ vis      ^ (s) ]],
-    [[ stateMut ^ (s) ]].
+    [[ stateMut ^ (s) ]],
+    Map1T [[ args ^ (s) : tysArgs ]],
+
+    tyFunT == FunctionT(tysArgs, tyRet),
+    VarT() <sub! tyFunT.
   
   //Void type is added to fix return type problems
-  [[ VoidType() ^ (s) : VoidT()    ]].
+  [[ VoidType() ^ (s) : VoidT() ]].
   
   //Tuple type is used to wrap return types
   [[ TupleType(params) ^ (s) : TupleT(tys) ]] :=
@@ -131,41 +175,19 @@ rules
   
   //-----------------------------------------------------------------------------------------------
   //Mappings
-  [[ MappingType(from, to) ^ (s) : ty ]] :=
-    [[ from ^ (s) : fromTy ]],
-    [[ to   ^ (s) : toTy   ]],
-    ty == MappingT(fromTy, toTy),
-    VarT() <sub! ty.
+  [[ MappingType(key, value) ^ (s) : tyMapping ]] :=
+    [[ key   ^ (s) : tyKey   ]],
+    [[ value ^ (s) : tyValue ]],
+    tyMapping == MappingT(tyKey, tyValue),
+    VarT() <sub! tyMapping.
 
   //-----------------------------------------------------------------------------------------------
   //User defined types
-  [[ UserDefinedType(x) ^ (s) : tyRef ]] :=
+  [[ UserDefinedType(x) ^ (s) : tyUDef ]] :=
     TypeReferrable{x} -> s,
     TypeReferrable{x} |-> ref | error $[Cannot find any type [x]] @x,
-    ref : tyRef.
+    ref : tyUDef.
   
-  //-----------------------------------------------------------------------------------------------
-  //Var type
+  //------------------------------------------------------------------------------------------------
   [[ Var() ^ (s) : VarT() ]].
-  
-  //A reference to a type
-  [[ TypeRef(name) ^ (s) : tyRef ]] :=
-    TypeReferrable{name} -> s,
-    TypeReferrable{name} |-> ref | error $[Unable to find [name]] @name,
-    ref : tyRef | error @name.
-  
-  //A path reference to a type
-  [[ TypeRef(ref, name) ^ (s) : tyRef ]] :=
-    [[ ref ^ (s) : tyRefBase ]],
-    tyRefBase == NamedT(occ, tyRefBaseBase) | error $[Unable to find [ref]] @name,
-    
-    occ ?=I=> occScope | error @name,
-    
-    new resolveScope,
-    resolveScope -P-> occScope,
-    
-    TypeReferrable{name} -> resolveScope,
-    TypeReferrable{name} |-> ref | error $[Unable to find [name]] @name,
-    ref : tyRef | error @name.
-  
   

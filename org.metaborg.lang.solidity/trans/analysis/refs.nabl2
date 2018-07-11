@@ -1,0 +1,67 @@
+module analysis/refs
+
+imports
+  signatures/-
+
+signature
+  namespaces
+    Var { origin : term, constant : term }
+
+rules
+  //-----------------------------------------------------------------------------------------------
+  /**
+   * Resolves a reference to a variable.
+   */
+  ResolveVarRef [[ IdRef(name) ^ (s) : tyVRef ]] :=
+    Var{name} -> s,
+    Var{name} |-> var | error $[Cannot find variable with name [name]] @name,
+    var : tyVRef.
+  
+  ResolveVarRef [[ MemberRef(exp, ref) ^ (s) : tyMVRef ]] :=
+    [[ exp ^ (s) : tyExp ]],
+    typeScope is getScope of tyExp | error $[Type [tyExp] does not have fields!] @exp,
+    
+    //Resolve member in a temporary scope
+    new resolveVScope,
+    resolveVScope -P-> typeScope,
+    ResolveVarRef [[ ref ^ (resolveVScope) : tyMVRef ]].
+  
+  ResolveVarRef [[ b@BinExp(Subscript(), _, _) ^ (s) : tyVar ]] :=
+    [[ b ^ (s) : tyVar ]].
+  
+  //-----------------------------------------------------------------------------------------------
+  /**
+   * Resolves a function reference.
+   */
+  ResolveFunctionRef [[ IdRef(name) ^ (s) : tyFRef ]] :=
+    Function{name} -> s,
+    Function{name} |-> fun | error $[Cannot find function [name]] @name,
+    fun : tyFRef.
+  
+  ResolveFunctionRef [[ MemberRef(exp, ref) ^ (s) : tyMFRef ]] :=
+    [[ exp ^ (s) : tyExp ]],
+    typeScope is getScope of tyExp | error $[Type [tyExp] does not have functions!] @exp,
+    
+    //Resolve the reference in a temporary scope
+    new resolveFScope,
+    resolveFScope -P-> typeScope,
+    ResolveFunctionRef [[ ref ^ (resolveFScope) : tyMFRef ]].
+  
+  //-----------------------------------------------------------------------------------------------
+  /**
+   * Resolves a type reference.
+   */
+  ResolveTypeRef [[ IdRef(name) ^ (s) : tyTRef ]] :=
+    TypeReferrable{name} -> s,
+    TypeReferrable{name} |-> ref | error $[Cannot find type [name]] @name,
+    ref : tyTRef.
+  
+  ResolveTypeRef [[ MemberRef(exp, ref) ^ (s) : tyMTRef ]] :=
+    //The expression must refer to a type with a scope.
+    ResolveTypeRef [[ exp ^ (s) : NamedT(_, _, _) ]],
+    typeScope is getScope of tyExp | error $[Type [tyExp] cannot declare types!] @exp,
+    
+    //Resolve the reference in a temporary scope
+    new resolveTScope,
+    resolveTScope -P-> typeScope,
+    ResolveTypeRef [[ ref ^ (resolveTScope) : tyMTRef ]].
