@@ -1,14 +1,20 @@
 module Common
 
+context-free start-symbols
+  STRING
+  HEXSTRING
+  NUMBER
+
 lexical syntax
 
   ID             = [a-zA-Z\_\$] [a-zA-Z0-9\_\$]*
   PATH           = ID ("." ID)*
   
   INT            = [0-9]+ 
-  FRACT          = [0-9]* "." [0-9]*
-  DECIMAL        = INT ("." [0-9]*)? ('e' INT)?
-  HEXINT         = "0x" [0-9a-fA-F]+
+  FRACT          = ("." [0-9]+) | ([0-9]+ ".") | ([0-9]+ "." [0-9]+)
+  HEXINT         = [0-9a-fA-F]+ //"0x" [0-9a-fA-F]+
+  
+  SCIENTIFIC     = (INT | FRACT) 'e' INT
   
   NumberUnit     = "wei" | "szabo" | "finney" | "ether" | "seconds" | "minutes" | "hours" | "days" | "weeks" | "years"
   
@@ -30,7 +36,7 @@ lexical syntax
   //Hex strings
   HEXSTRING      = "hex" "\"" (HexStringChar HexStringChar)* "\""
   HEXSTRING      = "hex" "'" (HexStringChar HexStringChar)* "'"
-  HexStringChar  = [0-9A-F]
+  HexStringChar  = [0-9A-Fa-f]
   
   //Comments
   LAYOUT         = [\ \t\n\r] 
@@ -50,6 +56,7 @@ lexical syntax
   KEYWORD = "catch"
   KEYWORD = "default"
   KEYWORD = "final"
+  KEYWORD = "in"
   KEYWORD = "inline"
   KEYWORD = "let"
   KEYWORD = "match"
@@ -69,7 +76,6 @@ lexical restrictions
   CommentChar   -/- [\/]
   INT           -/- [0-9]
   HEXINT        -/- [0-9a-fA-F]
-  DECIMAL       -/- [0-9\.]
   FRACT         -/- [0-9\.]
   ID            -/- [a-zA-Z0-9\_\$]
   PATH          -/- [a-zA-Z0-9\_\$\.] //TODO
@@ -89,3 +95,9 @@ context-free restrictions
   LAYOUT? -/- [\ \t\n\r]
   LAYOUT? -/- [\/].[\/]
   LAYOUT? -/- [\/].[\*]
+
+syntax
+  NUMBER-CF.Int        = INT-CF
+  NUMBER-CF.Decimal    = FRACT-CF
+  NUMBER-CF.Scientific = SCIENTIFIC-CF
+  NUMBER-CF.HexInt     = "0x" HEXINT-CF

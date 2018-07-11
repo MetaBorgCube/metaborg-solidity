@@ -8,7 +8,7 @@ imports
 language
 
   table         : target/metaborg/sdf.tbl
-  start symbols : Start
+  start symbols : EBCStart
 
   line comment  : "//"
   block comment : "/*" * "*/"
@@ -20,6 +20,9 @@ menus
     
     action: "Format"          = editor-format (source)
     action: "Show parsed AST" = debug-show-aterm (source)
+
+  menu: "Generation" (openeditor)
+    action: "Generate Hex"    = generate-hex (source)
 
 views
   

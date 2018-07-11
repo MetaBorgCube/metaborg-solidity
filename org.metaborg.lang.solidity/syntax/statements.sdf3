@@ -46,8 +46,8 @@ context-free syntax
   //The first statement of for can be either ";", a variable declaration or an expression statement
   Statement.For      = < for (<ForStatement> <Exp?>; <Exp?>) <Statement> >
   ForStatement.None  = <;>
-  ForStatement       = VarDeclStatement
-  ForStatement       = ExpStatement
+  ForStatement.SomeA = VarDeclStatement
+  ForStatement.SomeB = ExpStatement
   
   Statement.Continue = <continue;>
   Statement.Break    = <break;>
@@ -60,10 +60,21 @@ context-free syntax
   VarDeclStatement.DeclareVarAssign = <<LocalVarType> <ID> = <Exp>;>
   Statement                         = VarDeclStatement
   
+  //---------------------------------------------------------------------------
+  //Underscore statement (modifiers)
+  UnderscoreStatement.Underscore = <_;> {prefer}
+  Statement                      = UnderscoreStatement
+  
   //-----------------------------------------------------------------
   //Arbitrary Expressions
   ExpStatement.ExpStmt = <<Exp>;>
   Statement            = ExpStatement
+  
+  //-----------------------------------------------------------------
+  //Return statements
+  ReturnStatement.VoidReturn      = <return;>
+  ReturnStatement.ReturnStatement = <return <Exp>;>
+  Statement                       = ReturnStatement
   
   //-----------------------------------------------------------------
   //Inline assembly
@@ -73,14 +84,7 @@ context-free syntax
   //Added Print statement for usefullness
   ExtraStatement.Print = < print(<Exp>); >
   Statement = ExtraStatement
-  
-  //-----------------------------------------------------------------
-  //Shorthand for a statement or a return.
-  StatementOrReturn = Statement
-  StatementOrReturn = ReturnStatement
-  
-  StatementOrVoidReturn = Statement
-  StatementOrVoidReturn = VoidReturnStatement
-  
-  VoidReturnStatement.VoidReturn  = <return;>
-  ReturnStatement.ReturnStatement = <return <Exp>;>
+
+
+context-free priorities
+  UnderscoreStatement.Underscore > ExpStatement.ExpStmt

@@ -1,0 +1,33 @@
+module analysis/functionmodifiers
+
+imports
+  signatures/-
+
+signature
+  namespaces
+    FunctionModifier
+
+rules
+  [[ FunctionModifier(name, params, stmt) ^ (s) ]] :=
+    //Define modifier and type, also make it referrable
+    FunctionModifier{name} <- s,
+    TypeReferrable{name}   <- s,
+    FunctionModifier{name} : modType !,
+    TypeReferrable{name}   : modType !,
+    modType == NamedT(FunctionModifier{name}, FunctionModT(paramTys)),
+    
+    //Create scope
+    new modScope,
+    modScope -P-> s,
+    
+    // Resolve parameters
+    [[ params ^ (modScope) : paramTys ]],
+    
+    //Resolve body
+    [[ stmt ^ (modScope) ]],
+
+    FunctionModifier{name} =I=> modScope,
+    TypeReferrable{name}   =I=> modScope.
+  
+  [[ FMParams(params) ^ (modScope) : paramTys]] :=
+    Map1T [[ params ^ (modScope) : paramTys ]].

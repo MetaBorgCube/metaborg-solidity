@@ -1,7 +1,7 @@
 module analysis
 
 imports
-  
+  nabl2/shared
   nabl2/api
   nabl2/runtime
 
@@ -17,6 +17,7 @@ signature
     ReturnParam   : Origin
     Local         : Origin
     StructField   : Origin
+    EnumValue     : Origin
     
     TrueC         : Constant
     FalseC        : Constant

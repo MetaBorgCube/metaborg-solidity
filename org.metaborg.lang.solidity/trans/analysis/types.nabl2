@@ -1,7 +1,8 @@
 module analysis/types
 
 imports
-  signatures/-
+  signatures/types-sig
+  signatures/vars-sig
 
 signature
   sorts
@@ -9,43 +10,65 @@ signature
   
   constructors
     //Numeric types
-    IntT       : INT -> Type
-    UIntT      : INT -> Type
-    FixedT     : INT * INT -> Type
-    UFixedT    : INT * INT -> Type
+    IntT         : INT -> Type
+    UIntT        : INT -> Type
+    FixedT       : INT * INT -> Type
+    UFixedT      : INT * INT -> Type
     
     //One word types
-    BoolT      : Type
-    AddressT   : Type
-//    ByteT      : Type //byte == bytes1
-    StringT    : Type
+    BoolT        : Type
+    AddressT     : Type
+//    ByteT        : Type //byte == bytes1
+    StringT      : Type
     
     //Byte arrays
-    FBytesT    : INT -> Type
-    DBytesT    : Type
+    FBytesT      : INT -> Type
+    DBytesT      : Type
     
     //Array types
-    FArrayT    : Type * INT -> Type
-    DArrayT    : Type -> Type
+    FArrayT      : Type * INT -> Type
+    DArrayT      : Type -> Type
     
     //Function types
-    FunctionT  : list(Type) * list(Type) -> Type
+    FunctionT    : list(Type) * list(Type) -> Type
+    FunctionModT : list(Type) -> Type
     
     //Mapping types
-    MappingT   : Type * Type -> Type
+    MappingT     : Type * Type -> Type
 
     //User defined types
-    UserDefT   : occurrence -> Type
-    EnumT      : occurrence -> Type
-    EventT     : occurrence -> Type
-    StructT    : occurrence -> Type
-    ContractT  : occurrence -> Type
-    InterfaceT : occurrence -> Type
-    LibraryT   : occurrence -> Type
-    BuiltInT   : occurrence -> Type
+    EnumT        : Type
+    EventT       : list(Type) -> Type
+    StructT      : Type
+    ContractT    : Type
+    InterfaceT   : Type
+    LibraryT     : Type
+    BuiltInT     : Type
+    
+    //Named type
+    NamedT       : occurrence * Type -> Type
     
     //Var type
-    VarT       : Type
+    VarT         : Type
+    
+    //Void type (for functions with no return)
+    VoidT        : Type
+    
+    //Simplified type
+    IntTS        : Type
+    UIntTS       : Type
+    FBytesTS     : Type
+    FixedTS      : Type
+    UFixedTS     : Type
+    FArrayTS     : Type -> Type
+    NamedTS      : Type
+    
+    //More general types for constants
+    NrT          : INT * INT -> Type
+    FractT       : INT * INT * INT * INT -> Type
+    StringLitT   : INT -> Type
+    
+    InvalidType  : Type
   
   namespaces
     //Something that can be referenced as a type.
@@ -100,14 +123,35 @@ rules
 
   //-----------------------------------------------------------------------------------------------
   //User defined types
-  [[ UserDefinedType(x) ^ (s) : ty ]] :=
+  [[ UserDefinedType(x) ^ (s) : tyRef ]] :=
     //TODO
     //Lookup the type
     TypeReferrable{x} -> s,
     TypeReferrable{x} |-> ref | error $[Cannot find any user defined type [x]] @x,
-    ref : ty.
+    ref : tyRef.
   
   //-----------------------------------------------------------------------------------------------
   //Var type
   [[ Var() ^ (s) : VarT() ]].
+  
+  //A reference to a type
+  [[ TypeRef(name) ^ (s) : tyRef ]] :=
+    TypeReferrable{name} -> s,
+    TypeReferrable{name} |-> ref | error $[Unable to find [name]] @name,
+    ref : tyRef | error @name.
+  
+  //A path reference to a type
+  [[ TypeRef(ref, name) ^ (s) : tyRef ]] :=
+    [[ ref ^ (s) : tyRefBase ]],
+    tyRefBase == NamedT(occ, tyRefBaseBase) | error $[Unable to find [ref]] @name,
+    
+    occ ?=I=> occScope | error @name,
+    
+    new resolveScope,
+    resolveScope -P-> occScope,
+    
+    TypeReferrable{name} -> resolveScope,
+    TypeReferrable{name} |-> ref | error $[Unable to find [name]] @name,
+    ref : tyRef | error @name.
+  
   

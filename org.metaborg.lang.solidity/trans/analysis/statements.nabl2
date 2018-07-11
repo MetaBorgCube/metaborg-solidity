@@ -1,7 +1,8 @@
 module analysis/statements
 
 imports
-  signatures/-
+  signatures/statements-sig
+  signatures/assembly-sig
 
 rules
   //-----------------------------------------------------------------------------------------------
@@ -34,12 +35,12 @@ rules
     [[ loopExp  ^ (s) : lty]],
     [[ bodyStmt ^ (s) ]].
   
-  [[ For(preStmt, condExp, None(), bodyStmt) ^ (s) ]] :=
+  [[ For(Some(preStmt), condExp, None(), bodyStmt) ^ (s) ]] :=
     [[ preStmt  ^ (s) ]],
     [[ condExp  ^ (s) : BoolT() ]],
     [[ bodyStmt ^ (s) ]].
   
-  [[ For(preStmt, condExp, Some(loopExp), bodyStmt) ^ (s) ]] :=
+  [[ For(Some(preStmt), condExp, Some(loopExp), bodyStmt) ^ (s) ]] :=
     [[ preStmt  ^ (s) ]],
     [[ condExp  ^ (s) : BoolT() ]],
     [[ loopExp  ^ (s) : lty]],
@@ -48,33 +49,84 @@ rules
   [[ Break()      ^ (s) ]].
   [[ Continue()   ^ (s) ]].
   [[ Throw()      ^ (s) ]].
+//  [[ Emit(name, args) ^ (s) ]] :=
+//    Event{name} -> s,
+//    Event{name} |-> event | error $[Unable to find event [name]] @name,
+//    event : tyEvent,
+//    tyEvent == NamedT(event, EventT(paramTys)),
+//    
+//    Map1T [[ args ^ (s) : argTys ]],
+//    argTys <sub? paramTys | error $[The types of the arguments [argTys] do not match the event parameter types [paramTys]].
+
+  [[ Emit(ref, args) ^ (s) ]] :=
+    [[ ref ^ (s) : tyRef ]],
+    tyRef == NamedT(event, tyEvent) | error $[Cannot find event [ref]], //place at args to fix incorrect placement
+    tyEvent == EventT(paramTys)     | error $[[ref] is not an event],   //place at args to fix incorrect placement
+    
+    Map1T [[ args ^ (s) : argTys ]],
+    argTys <sub? paramTys | error $[The types of the arguments [argTys] do not match the event parameter types [paramTys]].
+  
   [[ Emit(call)   ^ (s) ]] :=
+    false | note $[Failed to desugar emit],
     [[ call ^ (s) : ty ]].
   
+  //TODO Idea: Have different named rules in nabl for return statements in different contexts?
   
-  //TODO Check if void return is allowed in method?
+  //Return statements in constructor
   [[ VoidReturn() ^ (s) ]].
   [[ ReturnStatement(exp) ^ (s) ]] :=
-    //TODO Check if return type matches expected function return type
-    [[ exp ^ (s) : actTy ]].
+    [[ exp ^ (s) : actTy ]],
+    false | error $[Only "return;" is allowed in constructors!].
+  
+  //Return statements in function
+  [[ VoidReturn(funName) ^ (s) ]] :=
+    //Check if corresponding function doesn't have a return type
+    Function{funName} -> s,
+    Function{funName} |-> fun | error $[Unable to find function corresponding to this return statement. Name: [funName]],
+    fun : FunctionT(paramTys, retTys) | warning $[Actual return type (void) does not match expected return type [retTys]!],
+    retTys == [] | warning $[Actual return type (void) does not match expected return type [retTys]!].
+  [[ ReturnStatement(funName, exp) ^ (s) ]] :=
+    [[ exp ^ (s) : expRetTy ]],
+    //Check if corresponding function has a matching return type
+    Function{funName} -> s,
+    Function{funName} |-> fun | error $[Unable to find function corresponding to this return statement. Name: [funName]],
+    fun : tyFun,
+    tyFun == FunctionT(paramTys, retTys),
+    [expRetTy] <sub? retTys | warning $[Actual return type [expRetTy] does not match expected return type [retTys]].
   
   //-----------------------------------------------------------------------------------------------
   //Variable declarations
   [[ DeclareVar(stype, name) ^ (s) ]] :=
-    [[ stype ^ (s) : ty ]],
+    [[ stype ^ (s) : tyVarDecl ]],
     Var{name} <- s,
     Var{name}.origin := Local(),
-    Var{name} : ty !.
+    Var{name} : tyVarDecl !.
   
   [[ DeclareVarAssign(stype, name, exp) ^ (s) ]] :=
-    [[ stype ^ (s) : defTy  ]],
-    [[ exp   ^ (s) : initTy ]],
+    [[ stype ^ (s) : tyVarDecl ]],
+    [[ exp   ^ (s) : tyVarInit ]],
     //TODO Assignable from relation for initializers
-    defTy <? initTy | error $[Initializer type [initTy] does not match defined type [defTy]] @exp,
+    tyVarInit <sub? tyVarDecl | error $[Initializer type [tyVarInit] does not match defined type [tyVarDecl]] @exp,
     
     Var{name} <- s,
     Var{name}.origin := Local(),
-    Var{name} : defTy !.
+    Var{name} : tyVarDecl !.
+  
+  //var x = 10; --> x = NrT(8, 8)
+  [[ DeclareVarVar(name, exp) ^ (s) ]] :=
+    [[ exp   ^ (s) : tyVarInit ]],
+//    tyVarInit <test? IsType() | error $[Unable [tyVarInit] does not match defined type [tyVarDecl]] @exp,
+    
+    Var{name} <- s,
+    Var{name}.origin := Local(),
+    Var{name} : tyVarInit !.
+  
+  //var x;
+  [[ DeclareVarVar(name) ^ (s) ]] :=
+    Var{name} <- s,
+    Var{name}.origin := Local(),
+    Var{name} : tyVarVar !,
+    false | warning $[Using var without immediate assignment is not supported!].
 
   //-----------------------------------------------------------------------------------------------
   //Expression statements
@@ -85,3 +137,9 @@ rules
   //Inline assembly
   [[ Assembly(_, _) ^ (s) ]] :=
     false | note $[Inline assembly is not checked].
+  
+  //-----------------------------------------------------------------------------------------------
+  //Dead code
+  [[ DeadStatement(stmt) ^ (s) ]] :=
+    [[ stmt ^ (s) ]],
+    false | warning $[Dead code].

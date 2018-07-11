@@ -8,7 +8,16 @@ imports
   analysis
   desugar/solidity
   signatures/solidity-sig
-
+  
+  //Code generation
+  codegen/-
+  
+  libstratego-gpp
+  libspoofax/sdf/pp
+  libspoofax/core/language
+  
+  ebc/ebcshared/ebcpp
+  
 rules // Debugging
   
   debug-show-aterm:
@@ -22,3 +31,18 @@ rules // Debugging
 	where
 	filename := <guarantee-extension(|"desugared.aterm")> path ;
 	text     := <desugar-all> selected
+
+  editor-resugar:
+    (node, _, ast, path, project-path) -> (filename, result)
+    with
+      ext      := <get-extension> path
+    ; filename := <guarantee-extension(|$[pp.resugar.[ext]])> path
+    ; result   := <pp-debug> <resugar-all> <desugar-all> node
+  
+  
+  /**
+   * Pretty-prints an EBC AST into EBC concrete syntax.
+   *
+   * @type EBC AST -> EBC concrete syntax
+   */
+  ebc-pp = pp-evmbytecode-string //call-in-language(|"evmbytecode", "pp-evmbytecode-string")

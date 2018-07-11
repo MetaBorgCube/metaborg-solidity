@@ -7,7 +7,8 @@ imports
 
 language
 
-  extensions : bin
+  extensions : ebc
 
+  provider : lib/core-3.4.0.jar
   provider : target/metaborg/stratego.ctree
   provider : target/metaborg/stratego-javastrat.jar

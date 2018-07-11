@@ -24,6 +24,7 @@ sorts
 
 context-free start-symbols
   Exp
+  //LitNumber
   
 context-free syntax
   Exp = < (<Exp>) > {bracket}
@@ -74,20 +75,16 @@ context-free syntax
   
   //---------------------------------------------------------------------------
   //Member access
-  Exp.Member = < <Exp>.<ID> > {left}
+//  Exp.Member = < <Exp>.<ID> > {left}
   
   //---------------------------------------------------------------------------
   //Function calls
   Exp.Call   = FunctionCall
-  FunctionCall.FunctionCall = < <Exp>(<{Exp ", "}*>) > {left}
+  FunctionCall.FunctionCall = < <Exp>(<{AlsoExp ", "}*>) > {left}
   
   //---------------------------------------------------------------------------
   //Literals
-  LitNumber = <<DECIMAL>>
-  LitNumber = <<HEXINT>>
-  
-  Exp.NumberLit = <<LitNumber> <NumberUnit?>>
-  Exp.FractLit  = <<FRACT>>
+  Exp.NumberLit = <<NUMBER> <NumberUnit?>>
   Exp.HexLit    = <<HEXSTRING>>
   Exp.StringLit = <<STRING>>
   Exp.True      = <true>
@@ -107,7 +104,7 @@ context-free syntax
   
   //---------------------------------------------------------------------------
   //Cast
-  Exp.Cast = < <Type>(<Exp>) > {right, avoid}
+  Exp.Cast        = < <SimpleCastType>(<Exp>) > {right}
   
   //---------------------------------------------------------------------------
   //Tenary if statement
@@ -116,7 +113,7 @@ context-free syntax
   //-----------------------------------------------------------------
   //Assignment
   Exp.Assign      = <<VarRef> = <Exp>>        {right}
-  Exp.AssignArray = <<VarRef>[<Exp>] = <Exp>> 
+  Exp.AssignArray = <<Exp>[<Exp>] = <Exp>> {right}
   
   //-----------------------------------------------------------------
   //LValue shorthands
@@ -142,8 +139,8 @@ context-free priorities
     Exp.RetInc Exp.RetDec
     Exp.NewObject
     Exp.Subscript
-    Exp.Member
-    Exp.Call} >
+    VarRef.Member
+    FunctionCall.FunctionCall} >
   {right:
     Exp.IncRet Exp.DecRet
     Exp.UMin Exp.UPlus
@@ -162,4 +159,5 @@ context-free priorities
   {non-assoc: Exp.Or} >
   {left: Exp.Ternary} >
   {right: Exp.Assign Exp.AssignArray Exp.LValAssign},
-  {left: Exp.Call} > {right: Exp.Cast}
+  //TODO Solve problems between casts and calls by only making the distinction in the desugaring/nabl?
+  {right: Exp.Cast} > {left: FunctionCall.FunctionCall}

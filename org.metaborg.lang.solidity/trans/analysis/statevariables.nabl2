@@ -8,23 +8,46 @@ signature
     //StateVar { constant : term }
 
 rules
-  [[ StateVariable(solty, mod, name, assignment) ^ (s) ]] :=
-    [[ solty ^ (s) : ty ]],
+  [[ StateVariable(solty, mod, name, None()) ^ (s) ]] :=
+    [[ solty ^ (s) : tyStateVar ]],
     
     Var{name} <- s,
     Var{name}.origin   := StateVariable(),
     Var{name}.constant := FalseC(),
-    Var{name} : ty !.
+    Var{name} : tyStateVar !.
     //TODO modifier
-    //TODO assignment
+  [[ StateVariable(solty, mod, name, Some(exp)) ^ (s) ]] :=
+    [[ solty ^ (s) : tyStateVar ]],
+    
+    Var{name} <- s,
+    Var{name}.origin   := StateVariable(),
+    Var{name}.constant := FalseC(),
+    Var{name} : tyStateVar !,
+    
+    [[ exp ^ (s)    : tyAssignExp ]],
+    tyAssignExp <sub? tyStateVar | error $[Cannot assign expression of type [tyAssignExp] to a variable of type [tyStateVar]] @exp.
+    //TODO modifier
   
-  [[ ConstantStateVariable(solty, mod1, _, mod2, name, assignment) ^ (s) ]] :=
-    [[ solty ^ (s) : ty ]],
+  [[ ConstantStateVariable(solty, mod, name, None()) ^ (s) ]] :=
+    [[ solty ^ (s) : tyStateVar ]],
     
     Var{name} <- s,
     Var{name}.origin   := StateVariable(),
     Var{name}.constant := TrueC(),
-    Var{name} : ty !.
+    Var{name} : tyStateVar !,
+    
+    false | warning $[Constants should have initializers!].
     //TODO modifier
-    //TODO assignment
+    //TODO constant
+  [[ ConstantStateVariable(solty, mod, name, Some(exp)) ^ (s) ]] :=
+    [[ solty ^ (s) : tyStateVar ]],
+    
+    Var{name} <- s,
+    Var{name}.origin   := StateVariable(),
+    Var{name}.constant := TrueC(),
+    Var{name} : tyStateVar !,
+    
+    [[ exp ^ (s)    : tyAssignExp ]],
+    tyAssignExp <sub? tyStateVar | error $[Cannot assign expression of type [tyAssignExp] to a variable of type [tyStateVar]] @exp.
+    //TODO modifier
     //TODO constant

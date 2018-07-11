@@ -12,7 +12,8 @@ rules
     Var{"abi" @p} <- programScope,
     Var{"abi" @p} : tyAbi,
     Var{"abi" @p} =I=> abiScope,
-    tyAbi == BuiltInT(Var{"abi" @p}),
+    tyAbi == NamedT(Var{"abi" @p}, BuiltInT()),
+//    tyAbi == BuiltInT(Var{"abi" @p}),
     
     //TODO Abi functions (with variable argument counts)
     
@@ -23,7 +24,8 @@ rules
     Var{"msg" @p} <- programScope,
     Var{"msg" @p} : tyMsg,
     Var{"msg" @p} =I=> msgScope,
-    tyMsg == BuiltInT(Var{"msg" @p}),
+    tyMsg == NamedT(Var{"msg" @p}, BuiltInT()),
+//    tyMsg == BuiltInT(Var{"msg" @p}),
     
     Var{"data"} <- msgScope,
     Var{"data"} : DBytesT() !!,
@@ -44,7 +46,8 @@ rules
     Var{"block" @p} <- programScope,
     Var{"block" @p} : tyBlock,
     Var{"block" @p} =I=> blockScope,
-    tyBlock == BuiltInT(Var{"block" @p}),
+    tyBlock == NamedT(Var{"block" @p}, BuiltInT()),
+//    tyBlock == BuiltInT(Var{"block" @p}),
     
     Var{"coinbase"} <- blockScope,
     Var{"coinbase"} : AddressT() !!,
@@ -70,7 +73,8 @@ rules
     Var{"tx" @p} <- programScope,
     Var{"tx" @p} : tyTx,
     Var{"tx" @p} =I=> txScope,
-    tyTx == BuiltInT(Var{"tx" @p}),
+    tyTx == NamedT(Var{"tx" @p}, BuiltInT()),
+//    tyTx == BuiltInT(Var{"tx" @p}),
     
     Var{"gasprice"} <- txScope,
     Var{"gasprice"} : UIntT(256) !!,
@@ -81,7 +85,7 @@ rules
     //---------------------------------------------------------------------------------------------
     //Global functions and variables
     Function{"assert"} <- programScope,
-    Function{"assert"} : FunctionT([ BoolT() ], []) !!,
+    Function{"assert"} : FunctionT([ BoolT() ], [ VoidT() ]) !!,
     
     //TODO Figure out a way to define 2 functions with the same name in the same nabl rule.
 //    Function{"blockhash"} <- programScope,
@@ -95,17 +99,17 @@ rules
     
     //TODO Figure out a way to define 2 functions with the same name in the same nabl rule.
 //    Function{"require"} <- programScope,
-//    Function{"require"} : FunctionT([ BoolT() ], []) !!,
+//    Function{"require"} : FunctionT([ BoolT() ], [ VoidT() ]) !!,
     
     Function{"require"} <- programScope,
-    Function{"require"} : FunctionT([ BoolT(), StringT() ], []) !!,
+    Function{"require"} : FunctionT([ BoolT(), StringT() ], [ VoidT() ]) !!,
     
     //TODO Figure out a way to define 2 functions with the same name in the same nabl rule.
 //    Function{"revert"} <- programScope,
-//    Function{"revert"} : FunctionT([], []) !!,
+//    Function{"revert"} : FunctionT([], [ VoidT() ]) !!,
     
     Function{"revert"} <- programScope,
-    Function{"revert"} : FunctionT([ StringT() ], []) !!,
+    Function{"revert"} : FunctionT([ StringT() ], [ VoidT() ]) !!,
     
     //---------------------------------------------------------------------------------------------
     //Hashing functions
@@ -125,12 +129,23 @@ rules
     
     Function{"selfdestruct"} <- programScope,
     Function{"selfdestruct"} : tyDestruct !!,
-    tyDestruct == FunctionT([ AddressT() ], []),
+    tyDestruct == FunctionT([ AddressT() ], [ VoidT() ]),
     
     Function{"suicide"} <- programScope,
     Function{"suicide"} : tyDestruct !!.
     
-    //TODO erecover, addmod, mulmod
-    
-    //TODO address balance, send, transfer
+//    Globals2 [[ p ^ (programScope) ]].
+//    
+//    //TODO erecover, addmod, mulmod
+//    
+//    //TODO address balance, send, transfer
+//  Globals2 [[ p ^ (programScope) ]] :=
+//    Function{"blockhash"} <- programScope,
+//    Function{"blockhash"} : FunctionT([ UIntT(256) ], [ FBytesT(32) ]) !!.
+//    
+////    Function{"require"} <- programScope,
+////    Function{"require"} : FunctionT([ BoolT() ], [ VoidT() ]) !!,
+////    
+////    Function{"revert"} <- programScope,
+////    Function{"revert"} : FunctionT([], [ VoidT() ]) !!.
     
