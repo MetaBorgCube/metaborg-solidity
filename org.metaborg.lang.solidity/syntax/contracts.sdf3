@@ -13,6 +13,7 @@ imports
 
 template options
   tokenize : "({;"
+  keyword -/- [a-zA-Z0-9]
 
 context-free start-symbols
   Contract
@@ -37,8 +38,8 @@ context-free syntax
     }>
   
   //The inherited contract with optionally a constructor invocation 
-  Inheritance.ID  = <<ID>>
-  Inheritance.Ext = <<ID>(<{Exp ", "}*>)>
+  Inheritance.InheritanceId  = <<ID>>
+  Inheritance.InheritanceExt = <<ID>(<{Exp ", "}*>)>
   
   //Contracts can contain basically anything.
   ContractContent = StateVariable

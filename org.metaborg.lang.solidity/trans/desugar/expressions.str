@@ -2,6 +2,7 @@ module desugar/expressions
 
 imports
   signatures/expressions-sig
+  signatures/tuples-sig
 
 signature
   sorts
@@ -30,8 +31,8 @@ signature
 	//++ and --
 	RetInc : UnOp
 	RetDec : UnOp
-	IncRet : UnOp //TODO Desugar?
-	DecRet : UnOp //TODO Desugar?
+	IncRet : UnOp
+	DecRet : UnOp
 	
 	//Comparison
 	Lt     : BinOp
@@ -51,12 +52,6 @@ signature
 	
 	//Create and delete
 	Delete : UnOp
-	
-	//?
-	Array : UnOp
-	Object : UnOp
-	
-	
 	
     //Sort rules
 	BinExp : BinOp * Exp * Exp     -> Exp
@@ -127,6 +122,10 @@ rules
   
   remove_lval: LShiftAssign(v, e1) -> Assign(v, BinExp(LShift(), v, e1))
   remove_lval: RShiftAssign(v, e1) -> Assign(v, BinExp(RShift(), v, e1))
+  
+  //---------------------------------------------------------------------------
+  //Tuple assignments of a single variable are just normal assignments
+  desugar: AssignTuple([TupleName(Some(name))], exp) -> Assign(name, exp)
 
   //---------------------------------------------------------------------------
   //Convert back to original AST

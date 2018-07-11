@@ -1,6 +1,7 @@
 module analysis/types
 
 imports
+  desugar/functions
   signatures/types-sig
   signatures/vars-sig
 
@@ -18,7 +19,6 @@ signature
     //One word types
     BoolT        : Type
     AddressT     : Type
-//    ByteT        : Type //byte == bytes1
     StringT      : Type
     
     //Byte arrays
@@ -30,11 +30,14 @@ signature
     DArrayT      : Type -> Type
     
     //Function types
-    FunctionT    : list(Type) * list(Type) -> Type // add VisibilityType
+    FunctionT    : list(Type) * Type -> Type
     FunctionModT : list(Type) -> Type
     
     //Mapping types
     MappingT     : Type * Type -> Type
+    
+    //Tuples
+    TupleT       : list(Type) -> Type
 
     //User defined types
     EnumT        : Type
@@ -60,7 +63,8 @@ signature
     FBytesTS     : Type
     FixedTS      : Type
     UFixedTS     : Type
-    FArrayTS     : Type -> Type
+    FArrayTS     : Type
+    DArrayTS     : Type
     NamedTS      : Type
     
     //More general types for constants
@@ -69,13 +73,13 @@ signature
     StringLitT   : INT -> Type
     
     InvalidType  : Type
-  
+
   namespaces
     //Something that can be referenced as a type.
-    //TODO Add origin-like field to distinguish between enums, events, etc.?
     TypeReferrable { origin : occurrence }
 
 rules
+  //-----------------------------------------------------------------------------------------------
   //Simple types
   [[ BooleanType() ^ (s) : BoolT()    ]].
   [[ AddressType() ^ (s) : AddressT() ]].
@@ -85,8 +89,8 @@ rules
   //Numbers
   [[ IntType(x)  ^ (s) : ty ]] := ty == IntT(x).
   [[ UIntType(x) ^ (s) : ty ]] := ty == UIntT(x).
-  [[ FixedType(MxN(m, n))  ^ (s) : ty ]] := ty == FixedT(m, n).
-  [[ UFixedType(MxN(m, n)) ^ (s) : ty ]] := ty == UFixedT(m, n).
+  [[ FixedType(MxN(m, n))  ^ (s) : ty ]] := ty == FixedT(m, n), VarT() <sub! ty.
+  [[ UFixedType(MxN(m, n)) ^ (s) : ty ]] := ty == UFixedT(m, n), VarT() <sub! ty.
   
   //-----------------------------------------------------------------------------------------------
   //Byte arrays
@@ -97,37 +101,47 @@ rules
   //Arrays
   [[ FixedArrayType(base, sizeExp) ^ (s) : ty ]] :=
     [[ base ^ (s) : baseTy ]],
-    //TODO Determine size from expression!
     [[ sizeExp ^ (s) : sizeTy ]],
-    //TODO Check if size is an int?
-    ty == FArrayT(baseTy, 1).
+    ty == FArrayT(baseTy, 1),
+    VarT() <sub! ty,
+    
+    false | note $[Size is not checked].
   
   [[ DynamicArrayType(base)        ^ (s) : ty ]] :=
     [[ base ^ (s) : baseTy ]],
-    ty == DArrayT(baseTy).
+    ty == DArrayT(baseTy),
+    VarT() <sub! ty.
   
   //-----------------------------------------------------------------------------------------------
   //Functions
-  [[ FunctionType(args, vis, stateMut, rets) ^ (s) : ty ]] :=
+  [[ FunctionType(args, vis, stateMut, retParam) ^ (s) : ty ]] :=
+    [[ retParam ^ (s) : retTy ]],
     Map1T [[ args ^ (s) : argTys ]],
-    Map1T [[ rets ^ (s) : retTys ]],
-    ty == FunctionT(argTys, retTys).
-    //TODO Store  visibility and mutability
+    ty == FunctionT(argTys, retParam),
+    
+    [[ vis      ^ (s) ]],
+    [[ stateMut ^ (s) ]].
+  
+  //Void type is added to fix return type problems
+  [[ VoidType() ^ (s) : VoidT()    ]].
+  
+  //Tuple type is used to wrap return types
+  [[ TupleType(params) ^ (s) : TupleT(tys) ]] :=
+    Map1T [[ params ^ (s) : tys ]].
   
   //-----------------------------------------------------------------------------------------------
   //Mappings
   [[ MappingType(from, to) ^ (s) : ty ]] :=
     [[ from ^ (s) : fromTy ]],
     [[ to   ^ (s) : toTy   ]],
-    ty == MappingT(fromTy, toTy).
+    ty == MappingT(fromTy, toTy),
+    VarT() <sub! ty.
 
   //-----------------------------------------------------------------------------------------------
   //User defined types
   [[ UserDefinedType(x) ^ (s) : tyRef ]] :=
-    //TODO
-    //Lookup the type
     TypeReferrable{x} -> s,
-    TypeReferrable{x} |-> ref | error $[Cannot find any user defined type [x]] @x,
+    TypeReferrable{x} |-> ref | error $[Cannot find any type [x]] @x,
     ref : tyRef.
   
   //-----------------------------------------------------------------------------------------------

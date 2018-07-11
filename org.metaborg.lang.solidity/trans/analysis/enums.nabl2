@@ -20,11 +20,13 @@ rules
     Var{name}            : enumType !,
     enumType == NamedT(Enum{name}, EnumT()),
     
+    VarT()       <sub! enumType,
+    
     //Create scope
     new enumScope,
     enumScope -P-> s,
     
-    // Resolve enum values
+    //Resolve enum values
     Map1T [[ values ^ (enumScope) : enumTys ]],
 
     Enum{name}           =I=> enumScope,

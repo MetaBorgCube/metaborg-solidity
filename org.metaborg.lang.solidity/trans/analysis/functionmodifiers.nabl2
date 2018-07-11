@@ -16,14 +16,12 @@ rules
     TypeReferrable{name}   : modType !,
     modType == NamedT(FunctionModifier{name}, FunctionModT(paramTys)),
     
-    //Create scope
+    VarT()       <sub! modType,
+    
     new modScope,
     modScope -P-> s,
     
-    // Resolve parameters
     [[ params ^ (modScope) : paramTys ]],
-    
-    //Resolve body
     [[ stmt ^ (modScope) ]],
 
     FunctionModifier{name} =I=> modScope,
